@@ -8,7 +8,7 @@ using UnityEngine;
 namespace UnityGCC
 {
     [CustomEditor(typeof(GCCSheet))]
-    public class GCCSheetEditor : Editor
+    public class GCCSheetEditor : UnityEditor.Editor
     {
         public override void OnInspectorGUI()
         {
