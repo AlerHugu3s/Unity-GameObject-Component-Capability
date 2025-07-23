@@ -45,7 +45,7 @@ namespace UnityGCC.Capabilities
                 DeActiveDuration += deltaTime;
         }
 
-        private void OnOwnerDestroyed()
+        public void OnOwnerDestroyed()
         {
             CapabilitiesController.Instance.RemoveCapability(this);
         }

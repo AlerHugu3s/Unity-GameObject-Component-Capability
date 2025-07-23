@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
-using UnityGCC.Capabilities;
 
 namespace UnityGCC.Components
 {
     public class BaseComponent : MonoBehaviour
     {
         public Dictionary<Instigator,HashSet<TagEnum>> BlockedTags;
-
+        
         public bool IsTagBlocked(TagEnum blockTag,Instigator instigator = null)
         {
             instigator ??= CapabilitiesController.Instance.Instigator;

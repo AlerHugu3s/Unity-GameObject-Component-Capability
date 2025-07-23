@@ -14,6 +14,11 @@ namespace UnityGCC
         private void Awake()
         {
             Instigator = new Instigator(this);
+            Capabilities = new Dictionary<TickGroup, List<BaseCapabilities>>();
+            for (int i = 0; i < (int)TickGroup.PostWork; i++)
+            {
+                Capabilities.Add((TickGroup)i,new List<BaseCapabilities>());
+            }
             Instance = this;
         }
 
@@ -36,6 +41,8 @@ namespace UnityGCC
             for (int i = 0; i <= (int)TickGroup.PostWork; i++)
             {
                 var tickGroup = (TickGroup)i;
+                if(!Capabilities.ContainsKey(tickGroup))
+                    Capabilities.Add(tickGroup, new List<BaseCapabilities>());
                 var tickGroupCapabilities = Capabilities[tickGroup];
                 foreach (var capability in tickGroupCapabilities)
                 {
