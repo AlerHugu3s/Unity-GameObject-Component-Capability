@@ -34,10 +34,6 @@ This project adopts the Capabilities architecture pattern, a modular approach to
 
 ---
 
-## Chinese
-
-这是一个基于Unity的游戏开发框架，实现了GDC 2025演讲"Capabilities: Coding ALL the Gameplay for 'Split Fiction'"中介绍的Capabilities编程设计模式。
-
 ## 🏗️ Core Architecture
 
 ### Core Class Structure
@@ -283,6 +279,10 @@ UnityGCC/
 ```
 
 ---
+
+## Chinese
+
+这是一个基于Unity的游戏开发框架，实现了GDC 2025演讲"Capabilities: Coding ALL the Gameplay for 'Split Fiction'"中介绍的Capabilities编程设计模式。
 
 ## 🎯 设计理念
 
