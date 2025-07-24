@@ -29,6 +29,41 @@ namespace UnityGCC.Editor
         private Color inactiveColor = Color.red;
         private Color backgroundTimelineColor = new Color(0.2f, 0.2f, 0.2f);
 
+        // 多语言支持
+        private bool useEnglish = false;
+
+        private string GetLocalizedText(string key)
+        {
+            var translations = new Dictionary<string, (string Chinese, string English)>
+            {
+                ["Title"] = ("Capabilities Monitor", "Capabilities Monitor"),
+                ["AutoRefresh"] = ("自动刷新", "Auto Refresh"),
+                ["ManualRefresh"] = ("手动刷新", "Manual Refresh"),
+                ["ShowTimeline"] = ("显示Timeline", "Show Timeline"),
+                ["TimeRange"] = ("时间范围:", "Time Range:"),
+                ["Seconds"] = ("秒", "sec"),
+                ["ClearHistory"] = ("清空历史", "Clear History"),
+                ["RefreshInterval"] = ("刷新间隔(秒)", "Refresh Interval (sec)"),
+                ["TimelineLog"] = ("Timeline Log", "Timeline Log"),
+                ["CurrentFrame"] = ("当前帧:", "Current Frame:"),
+                ["EventCount"] = ("事件数量:", "Event Count:"),
+                ["TimeRangeStatus"] = ("时间范围:", "Time Range:"),
+                ["NoTimelineData"] = ("暂无Timeline数据，开始游戏后将显示capability状态变化", "No Timeline data, capability state changes will be shown after starting the game"),
+                ["WaitingForChanges"] = ("等待capability状态变化...", "Waiting for capability state changes..."),
+                ["PlayModeRequired"] = ("需要在Play Mode下才能查看Capabilities状态", "Play Mode required to view Capabilities status"),
+                ["ControllerNotFound"] = ("未找到CapabilitiesController实例，请等待游戏完全启动", "CapabilitiesController instance not found, please wait for the game to fully start"),
+                ["Initializing"] = ("CapabilitiesController正在初始化中，请稍等...", "CapabilitiesController is initializing, please wait..."),
+                ["NoCapabilities"] = ("当前没有任何Capabilities", "No Capabilities currently available"),
+                ["Language"] = ("EN", "中文")
+            };
+
+            if (translations.TryGetValue(key, out var translation))
+            {
+                return useEnglish ? translation.English : translation.Chinese;
+            }
+            return key;
+        }
+
         [System.Serializable]
         public class CapabilityStateEvent
         {
@@ -95,19 +130,19 @@ namespace UnityGCC.Editor
 
             if (!Application.isPlaying)
             {
-                EditorGUILayout.HelpBox("需要在Play Mode下才能查看Capabilities状态", MessageType.Info);
+                EditorGUILayout.HelpBox(GetLocalizedText("PlayModeRequired"), MessageType.Info);
                 return;
             }
 
             if (CapabilitiesController.Instance == null)
             {
-                EditorGUILayout.HelpBox("未找到CapabilitiesController实例，请等待游戏完全启动", MessageType.Warning);
+                EditorGUILayout.HelpBox(GetLocalizedText("ControllerNotFound"), MessageType.Warning);
                 return;
             }
 
             if (CapabilitiesController.Instance.Capabilities == null)
             {
-                EditorGUILayout.HelpBox("CapabilitiesController正在初始化中，请稍等...", MessageType.Info);
+                EditorGUILayout.HelpBox(GetLocalizedText("Initializing"), MessageType.Info);
                 return;
             }
 
@@ -135,13 +170,25 @@ namespace UnityGCC.Editor
         {
             EditorGUILayout.BeginHorizontal();
 
-            EditorGUILayout.LabelField("Capabilities Monitor", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GetLocalizedText("Title"), EditorStyles.boldLabel);
 
             GUILayout.FlexibleSpace();
 
-            autoRefresh = EditorGUILayout.Toggle("自动刷新", autoRefresh, GUILayout.Width(80));
+            // 语言切换按钮
+            if (GUILayout.Button(GetLocalizedText("Language"), GUILayout.Width(60)))
+            {
+                useEnglish = !useEnglish;
+            }
 
-            if (GUILayout.Button("手动刷新", GUILayout.Width(80)))
+            // 帮助按钮
+            if (GUILayout.Button("?", GUILayout.Width(25)))
+            {
+                ShowHelp();
+            }
+
+            autoRefresh = EditorGUILayout.Toggle(GetLocalizedText("AutoRefresh"), autoRefresh, GUILayout.Width(120));
+
+            if (GUILayout.Button(GetLocalizedText("ManualRefresh"), GUILayout.Width(100)))
             {
                 Repaint();
             }
@@ -149,20 +196,20 @@ namespace UnityGCC.Editor
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.BeginHorizontal();
-            refreshInterval = EditorGUILayout.Slider("刷新间隔(秒)", refreshInterval, 0.05f, 1f);
+            refreshInterval = EditorGUILayout.Slider(GetLocalizedText("RefreshInterval"), refreshInterval, 0.05f, 1f);
             EditorGUILayout.EndHorizontal();
 
             // Timeline控制
             EditorGUILayout.BeginHorizontal();
-            showTimeline = EditorGUILayout.Toggle("显示Timeline", showTimeline, GUILayout.Width(100));
+            showTimeline = EditorGUILayout.Toggle(GetLocalizedText("ShowTimeline"), showTimeline, GUILayout.Width(200));
 
             if (showTimeline)
             {
-                EditorGUILayout.LabelField("时间范围:", GUILayout.Width(60));
+                EditorGUILayout.LabelField(GetLocalizedText("TimeRange"), GUILayout.Width(80));
                 timelineSeconds = EditorGUILayout.Slider(timelineSeconds, 5f, 60f, GUILayout.Width(150));
-                EditorGUILayout.LabelField("秒", GUILayout.Width(20));
+                EditorGUILayout.LabelField(GetLocalizedText("Seconds"), GUILayout.Width(30));
 
-                if (GUILayout.Button("清空历史", GUILayout.Width(80)))
+                if (GUILayout.Button(GetLocalizedText("ClearHistory"), GUILayout.Width(100)))
                 {
                     stateEvents.Clear();
                 }
@@ -283,7 +330,7 @@ namespace UnityGCC.Editor
         {
             if (groupedCapabilities == null || groupedCapabilities.Count == 0)
             {
-                EditorGUILayout.HelpBox("当前没有任何Capabilities", MessageType.Info);
+                EditorGUILayout.HelpBox(GetLocalizedText("NoCapabilities"), MessageType.Info);
                 return;
             }
 
@@ -401,12 +448,12 @@ namespace UnityGCC.Editor
 
         private void DrawTimelineHeader()
         {
-            EditorGUILayout.LabelField("Timeline Log", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GetLocalizedText("TimelineLog"), EditorStyles.boldLabel);
 
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"当前帧: {currentFrame}", GUILayout.Width(100));
-            EditorGUILayout.LabelField($"事件数量: {stateEvents.Count}", GUILayout.Width(100));
-            EditorGUILayout.LabelField($"时间范围: {timelineSeconds:F1}秒", GUILayout.Width(100));
+            EditorGUILayout.LabelField($"{GetLocalizedText("CurrentFrame")} {currentFrame}", GUILayout.Width(120));
+            EditorGUILayout.LabelField($"{GetLocalizedText("EventCount")} {stateEvents.Count}", GUILayout.Width(120));
+            EditorGUILayout.LabelField($"{GetLocalizedText("TimeRangeStatus")} {timelineSeconds:F1}{GetLocalizedText("Seconds")}", GUILayout.Width(120));
             EditorGUILayout.EndHorizontal();
         }
 
@@ -416,7 +463,7 @@ namespace UnityGCC.Editor
             {
                 if (stateEvents.Count == 0)
                 {
-                    EditorGUILayout.HelpBox("暂无Timeline数据，开始游戏后将显示capability状态变化", MessageType.Info);
+                    EditorGUILayout.HelpBox(GetLocalizedText("NoTimelineData"), MessageType.Info);
                     return;
                 }
 
@@ -440,7 +487,7 @@ namespace UnityGCC.Editor
                 if (groupedEvents.Count == 0)
                 {
                     GUI.Label(new Rect(timelineRect.x + 10, timelineRect.y + 30, timelineRect.width - 20, 30),
-                        "等待capability状态变化...",
+                        GetLocalizedText("WaitingForChanges"),
                         new GUIStyle(EditorStyles.label) { normal = { textColor = Color.white } });
                     return;
                 }
@@ -546,6 +593,56 @@ namespace UnityGCC.Editor
             // 添加"NOW"标签
             GUI.Label(new Rect(x - 15, timelineRect.y + timelineRect.height - 15, 30, 15), "NOW",
                 new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.yellow } });
+        }
+
+        private void ShowHelp()
+        {
+            string readmePath = "Assets/Scripts/Editor/CapabilitiesMonitor_README.md";
+
+            // 尝试在Unity中选中README文件
+            UnityEngine.Object readmeAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(readmePath);
+            if (readmeAsset != null)
+            {
+                EditorGUIUtility.PingObject(readmeAsset);
+                Selection.activeObject = readmeAsset;
+            }
+            else
+            {
+                // 如果找不到README文件，显示快速帮助对话框
+                string helpTitle = useEnglish ? "Capabilities Monitor Help" : "Capabilities Monitor 帮助";
+                string helpContent = useEnglish ?
+                    "Features:\n\n" +
+                    "📊 Real-time Status Monitoring:\n" +
+                    "  • Green(●) = Active\n" +
+                    "  • Red(●) = Inactive\n\n" +
+                    "📈 Timeline Features:\n" +
+                    "  • Check 'Show Timeline' to view history\n" +
+                    "  • Adjust time range (5-60 seconds)\n" +
+                    "  • Hover for event details\n\n" +
+                    "Usage:\n" +
+                    "1. Enter Play Mode\n" +
+                    "2. Wait for system initialization\n" +
+                    "3. Observe capability state changes\n\n" +
+                    "Detailed docs: Assets/Scripts/Editor/CapabilitiesMonitor_README.md"
+                    :
+                    "功能说明：\n\n" +
+                    "📊 实时状态监控：\n" +
+                    "  • 绿色(●) = 激活状态\n" +
+                    "  • 红色(●) = 未激活状态\n\n" +
+                    "📈 Timeline功能：\n" +
+                    "  • 勾选'显示Timeline'查看历史\n" +
+                    "  • 调整时间范围(5-60秒)\n" +
+                    "  • 悬停查看事件详情\n\n" +
+                    "使用方法：\n" +
+                    "1. 进入Play Mode\n" +
+                    "2. 等待系统初始化\n" +
+                    "3. 观察capability状态变化\n\n" +
+                    "详细文档：Assets/Scripts/Editor/CapabilitiesMonitor_README.md";
+
+                string okButton = useEnglish ? "OK" : "确定";
+
+                EditorUtility.DisplayDialog(helpTitle, helpContent, okButton);
+            }
         }
     }
 }
