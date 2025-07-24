@@ -64,6 +64,20 @@ namespace UnityGCC.Editor
         private void OnDisable()
         {
             EditorApplication.update -= OnEditorUpdate;
+
+            // 清理数据，避免保留无效引用
+            if (stateEvents != null)
+            {
+                stateEvents.Clear();
+            }
+            if (lastKnownStates != null)
+            {
+                lastKnownStates.Clear();
+            }
+            if (groupedCapabilities != null)
+            {
+                groupedCapabilities.Clear();
+            }
         }
 
         private void OnEditorUpdate()
@@ -87,21 +101,34 @@ namespace UnityGCC.Editor
 
             if (CapabilitiesController.Instance == null)
             {
-                EditorGUILayout.HelpBox("未找到CapabilitiesController实例", MessageType.Warning);
+                EditorGUILayout.HelpBox("未找到CapabilitiesController实例，请等待游戏完全启动", MessageType.Warning);
                 return;
             }
 
-            RefreshGroupedCapabilities();
-
-            // Timeline视图
-            if (showTimeline)
+            if (CapabilitiesController.Instance.Capabilities == null)
             {
-                DrawTimelineHeader();
-                DrawTimeline();
-                EditorGUILayout.Space();
+                EditorGUILayout.HelpBox("CapabilitiesController正在初始化中，请稍等...", MessageType.Info);
+                return;
             }
 
-            DrawCapabilitiesTree();
+            try
+            {
+                RefreshGroupedCapabilities();
+
+                // Timeline视图
+                if (showTimeline)
+                {
+                    DrawTimelineHeader();
+                    DrawTimeline();
+                    EditorGUILayout.Space();
+                }
+
+                DrawCapabilitiesTree();
+            }
+            catch (System.Exception e)
+            {
+                EditorGUILayout.HelpBox($"显示时发生错误: {e.Message}\n这通常发生在系统初始化期间，请稍等片刻", MessageType.Warning);
+            }
         }
 
         private void DrawHeader()
@@ -151,72 +178,105 @@ namespace UnityGCC.Editor
             currentFrame = Time.frameCount;
             float currentTime = Time.time;
 
-            if (CapabilitiesController.Instance?.Capabilities == null) return;
+            // 检查CapabilitiesController是否存在和初始化
+            if (CapabilitiesController.Instance == null) return;
+            if (CapabilitiesController.Instance.Capabilities == null) return;
 
-            foreach (var tickGroupPair in CapabilitiesController.Instance.Capabilities)
+            try
             {
-                var tickGroup = tickGroupPair.Key;
-                var capabilities = tickGroupPair.Value;
-
-                foreach (var capability in capabilities)
+                foreach (var tickGroupPair in CapabilitiesController.Instance.Capabilities)
                 {
-                    if (capability?.Owner == null) continue;
+                    var tickGroup = tickGroupPair.Key;
+                    var capabilities = tickGroupPair.Value;
 
-                    var owner = capability.Owner;
+                    // 检查capabilities列表是否为空
+                    if (capabilities == null) continue;
 
-                    if (!groupedCapabilities.ContainsKey(owner))
+                    foreach (var capability in capabilities)
                     {
-                        groupedCapabilities[owner] = new Dictionary<TickGroup, List<BaseCapabilities>>();
-                    }
+                        // 更严格的空值检查
+                        if (capability == null) continue;
+                        if (capability.Owner == null) continue;
 
-                    if (!groupedCapabilities[owner].ContainsKey(tickGroup))
-                    {
-                        groupedCapabilities[owner][tickGroup] = new List<BaseCapabilities>();
-                    }
+                        var owner = capability.Owner;
 
-                    groupedCapabilities[owner][tickGroup].Add(capability);
+                        if (!groupedCapabilities.ContainsKey(owner))
+                        {
+                            groupedCapabilities[owner] = new Dictionary<TickGroup, List<BaseCapabilities>>();
+                        }
 
-                    // 检测状态变化并记录事件
-                    if (showTimeline)
-                    {
-                        CheckAndRecordStateChange(capability, currentTime, currentFrame);
+                        if (!groupedCapabilities[owner].ContainsKey(tickGroup))
+                        {
+                            groupedCapabilities[owner][tickGroup] = new List<BaseCapabilities>();
+                        }
+
+                        groupedCapabilities[owner][tickGroup].Add(capability);
+
+                        // 检测状态变化并记录事件
+                        if (showTimeline)
+                        {
+                            CheckAndRecordStateChange(capability, currentTime, currentFrame);
+                        }
                     }
                 }
-            }
 
-            // 清理过期的事件
-            if (showTimeline)
+                // 清理过期的事件
+                if (showTimeline)
+                {
+                    CleanupOldEvents(currentTime);
+                }
+            }
+            catch (System.Exception e)
             {
-                CleanupOldEvents(currentTime);
+                // 静默处理初始化期间的异常，避免编辑器报错
+                Debug.LogWarning($"Capabilities Monitor: 初始化期间的异常 (可忽略): {e.Message}");
             }
         }
 
         private void CheckAndRecordStateChange(BaseCapabilities capability, float currentTime, int frame)
         {
-            bool currentState = capability.bActive;
-
-            if (lastKnownStates.ContainsKey(capability))
+            try
             {
-                bool lastState = lastKnownStates[capability];
-                if (lastState != currentState)
+                // 再次检查capability是否有效
+                if (capability == null || capability.Owner == null) return;
+
+                bool currentState = capability.bActive;
+
+                if (lastKnownStates.ContainsKey(capability))
                 {
-                    // 状态发生变化，记录事件
-                    stateEvents.Add(new CapabilityStateEvent(capability, currentState, currentTime, frame));
+                    bool lastState = lastKnownStates[capability];
+                    if (lastState != currentState)
+                    {
+                        // 状态发生变化，记录事件
+                        stateEvents.Add(new CapabilityStateEvent(capability, currentState, currentTime, frame));
+                        lastKnownStates[capability] = currentState;
+                    }
+                }
+                else
+                {
+                    // 首次记录
                     lastKnownStates[capability] = currentState;
+                    stateEvents.Add(new CapabilityStateEvent(capability, currentState, currentTime, frame));
                 }
             }
-            else
+            catch (System.Exception e)
             {
-                // 首次记录
-                lastKnownStates[capability] = currentState;
-                stateEvents.Add(new CapabilityStateEvent(capability, currentState, currentTime, frame));
+                // 静默处理状态检查异常
+                Debug.LogWarning($"Capabilities Monitor: 状态检查异常 (可忽略): {e.Message}");
             }
         }
 
         private void CleanupOldEvents(float currentTime)
         {
-            float cutoffTime = currentTime - timelineSeconds;
-            stateEvents.RemoveAll(e => e.time < cutoffTime);
+            try
+            {
+                float cutoffTime = currentTime - timelineSeconds;
+                stateEvents.RemoveAll(e => e.time < cutoffTime || e.capability == null || e.capability.Owner == null);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"Capabilities Monitor: 清理事件时异常 (可忽略): {e.Message}");
+            }
         }
 
         private void DrawCapabilitiesTree()
@@ -352,43 +412,56 @@ namespace UnityGCC.Editor
 
         private void DrawTimeline()
         {
-            if (stateEvents.Count == 0)
+            try
             {
-                EditorGUILayout.HelpBox("暂无Timeline数据", MessageType.Info);
-                return;
+                if (stateEvents.Count == 0)
+                {
+                    EditorGUILayout.HelpBox("暂无Timeline数据，开始游戏后将显示capability状态变化", MessageType.Info);
+                    return;
+                }
+
+                Rect timelineRect = GUILayoutUtility.GetRect(0, timelineHeight, GUILayout.ExpandWidth(true));
+
+                // 绘制背景
+                EditorGUI.DrawRect(timelineRect, backgroundTimelineColor);
+
+                float currentTime = Time.time;
+                float startTime = currentTime - timelineSeconds;
+
+                // 绘制时间刻度
+                DrawTimeScale(timelineRect, startTime, currentTime);
+
+                // 按capability分组事件，过滤掉无效的capability
+                var groupedEvents = stateEvents
+                    .Where(e => e.time >= startTime && e.capability != null && e.capability.Owner != null)
+                    .GroupBy(e => e.capability)
+                    .ToList();
+
+                if (groupedEvents.Count == 0)
+                {
+                    GUI.Label(new Rect(timelineRect.x + 10, timelineRect.y + 30, timelineRect.width - 20, 30),
+                        "等待capability状态变化...",
+                        new GUIStyle(EditorStyles.label) { normal = { textColor = Color.white } });
+                    return;
+                }
+
+                float rowHeight = (timelineRect.height - 30) / groupedEvents.Count; // 30是时间刻度的空间
+
+                for (int i = 0; i < groupedEvents.Count; i++)
+                {
+                    var group = groupedEvents[i];
+                    float rowY = timelineRect.y + 20 + i * rowHeight; // 20是顶部时间刻度空间
+
+                    DrawCapabilityTimeline(timelineRect, group.Key, group.ToList(), rowY, rowHeight, startTime, currentTime);
+                }
+
+                // 绘制当前时间线
+                DrawCurrentTimeLine(timelineRect, startTime, currentTime);
             }
-
-            Rect timelineRect = GUILayoutUtility.GetRect(0, timelineHeight, GUILayout.ExpandWidth(true));
-
-            // 绘制背景
-            EditorGUI.DrawRect(timelineRect, backgroundTimelineColor);
-
-            float currentTime = Time.time;
-            float startTime = currentTime - timelineSeconds;
-
-            // 绘制时间刻度
-            DrawTimeScale(timelineRect, startTime, currentTime);
-
-            // 按capability分组事件
-            var groupedEvents = stateEvents
-                .Where(e => e.time >= startTime)
-                .GroupBy(e => e.capability)
-                .ToList();
-
-            if (groupedEvents.Count == 0) return;
-
-            float rowHeight = (timelineRect.height - 30) / groupedEvents.Count; // 30是时间刻度的空间
-
-            for (int i = 0; i < groupedEvents.Count; i++)
+            catch (System.Exception e)
             {
-                var group = groupedEvents[i];
-                float rowY = timelineRect.y + 20 + i * rowHeight; // 20是顶部时间刻度空间
-
-                DrawCapabilityTimeline(timelineRect, group.Key, group.ToList(), rowY, rowHeight, startTime, currentTime);
+                EditorGUILayout.HelpBox($"Timeline绘制错误: {e.Message}", MessageType.Warning);
             }
-
-            // 绘制当前时间线
-            DrawCurrentTimeLine(timelineRect, startTime, currentTime);
         }
 
         private void DrawTimeScale(Rect timelineRect, float startTime, float currentTime)
